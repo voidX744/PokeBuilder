@@ -122,43 +122,31 @@ input:focus, select:focus, textarea:focus{outline:none; border-color:var(--neon)
 .loader{display:inline-block; width:22px; height:22px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--neon); animation:spin .8s linear infinite; vertical-align:-5px; margin-right:.6rem}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.roles{display:flex; flex-direction:column; gap:2rem; margin-bottom:1.5rem}
-.role{--rarity:var(--legendary)}
-.role:nth-child(4n+1){--rarity:var(--epic)}
-.role:nth-child(4n+2){--rarity:var(--rare)}
-.role:nth-child(4n+3){--rarity:var(--uncommon)}
-.role-head{display:flex; gap:1rem; align-items:flex-start; margin-bottom:.9rem}
-.role-num{font-family:var(--display); font-size:2.6rem; line-height:.9; color:var(--rarity)}
-.role-head h3{margin:0 0 .3rem; font-family:var(--display); font-weight:400; font-size:1.9rem; text-transform:uppercase; line-height:1; letter-spacing:.01em}
-.role-head p{margin:0; color:var(--muted); line-height:1.5; max-width:52rem}
-.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1.2rem}
-
-.card{
-  position:relative; display:flex; flex-direction:column; background:var(--panel);
-  border:1px solid var(--line); border-bottom:5px solid var(--rarity);
-  clip-path:polygon(0 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%);
-  transition:transform .18s, box-shadow .18s;
-}
-.card:hover{transform:translateY(-6px); box-shadow:0 0 0 3px var(--neon), 0 18px 40px rgba(0,0,0,.5)}
-.card-art{height:150px; display:grid; place-items:center; background:radial-gradient(circle at 50% 65%, color-mix(in srgb, var(--rarity) 30%, transparent), transparent 65%), #0a0d12}
-.card-art img{height:136px; width:136px; object-fit:contain; filter:drop-shadow(0 8px 10px rgba(0,0,0,.6))}
-.card-body{padding:1rem 1.1rem 1.3rem; display:flex; flex-direction:column; gap:.55rem; flex:1}
-.types{display:flex; gap:.35rem; flex-wrap:wrap}
+/* tick list */
 .tag{font:800 .62rem/1 var(--body); letter-spacing:.16em; text-transform:uppercase; color:#05070a; background:var(--tc,var(--rarity)); padding:.38rem .55rem; transform:skew(-10deg)}
-.card h4{margin:0; font-family:var(--display); font-weight:400; text-transform:uppercase; font-size:1.65rem; line-height:1; letter-spacing:.01em}
-.card .blurb{margin:0; color:#cfd6df; line-height:1.5; font-size:.92rem}
-.set{margin:0; padding:0; list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:.3rem .6rem; font-size:.8rem; font-weight:600; color:var(--muted)}
-.set li::before{content:"▸ "; color:var(--rarity)}
-.meta{display:flex; flex-wrap:wrap; gap:.3rem .8rem; font-size:.75rem; color:var(--muted); font-weight:600}
-.meta b{color:var(--text); font-weight:800}
-.card .btn{margin-top:auto; align-self:flex-start}
-
-/* choosing picks */
-.card.selected{box-shadow:0 0 0 3px var(--neon), 0 0 30px rgba(62,225,62,.25)}
-.card.selected:hover{box-shadow:0 0 0 3px var(--neon), 0 18px 40px rgba(0,0,0,.5)}
-.btn.ghost-on{background:transparent}
-.role.has-pick .role-num::after{content:" ✓"; font-size:1.2rem; color:var(--neon); vertical-align:top}
-.own-pick{color:var(--neon); font-size:.8rem; letter-spacing:.06em}
+.picklist{list-style:none; margin:0 0 1rem; padding:0; display:flex; flex-direction:column; gap:.6rem}
+.pick{background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--rarity); transition:border-color .15s, background .15s}
+.pick:hover{border-color:var(--neon); border-left-color:var(--rarity)}
+.pick.on{background:linear-gradient(90deg, rgba(62,225,62,.12), var(--panel) 60%); border-color:var(--neon)}
+.pick.off{opacity:.45}
+.pick label{display:grid; grid-template-columns:auto 64px 1fr; gap:1rem; align-items:center; padding:.7rem 1rem; cursor:pointer}
+.pick.off label{cursor:not-allowed}
+.pick input[type=checkbox]{
+  appearance:none; -webkit-appearance:none; width:28px; height:28px; margin:0; padding:0; border:2px solid var(--muted); background:var(--bg);
+  display:grid; place-items:center; cursor:inherit; transform:skew(-8deg);
+}
+.pick input[type=checkbox]::after{content:"✓"; font:900 1.1rem/1 var(--body); color:#041004; opacity:0}
+.pick input[type=checkbox]:checked{background:var(--neon); border-color:var(--neon); box-shadow:0 0 14px rgba(62,225,62,.5)}
+.pick input[type=checkbox]:checked::after{opacity:1}
+.pick input[type=checkbox]:focus-visible{outline:3px solid var(--neon); outline-offset:3px}
+.pick-art{width:64px; height:64px; display:grid; place-items:center}
+.pick-art img{width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 4px 6px rgba(0,0,0,.6))}
+.pick-info{display:flex; flex-direction:column; gap:.3rem; min-width:0}
+.pick-top{display:flex; align-items:center; gap:.45rem; flex-wrap:wrap}
+.pick-name{font-family:var(--display); font-weight:400; font-size:1.5rem; text-transform:uppercase; line-height:1; letter-spacing:.01em; margin-right:.2rem}
+.pick-role{font:800 .66rem/1 var(--body); letter-spacing:.16em; text-transform:uppercase; color:var(--rarity); margin-left:.3rem}
+.pick-reason{color:#cfd6df; font-size:.9rem; line-height:1.45}
+.pick-set{color:var(--muted); font-size:.78rem; font-weight:600}
 .donebar{
   position:sticky; bottom:16px; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;
   margin:0 0 3rem; padding:.8rem .8rem .8rem 1.2rem; background:var(--panel-2); border:2px solid var(--neon);
@@ -166,7 +154,7 @@ input:focus, select:focus, textarea:focus{outline:none; border-color:var(--neon)
 }
 .donebar span{font-family:var(--display); font-size:1.4rem; text-transform:uppercase; letter-spacing:.04em}
 
-.custom{display:flex; gap:.6rem; align-items:center; margin-top:1rem; flex-wrap:wrap}
+.custom{display:flex; gap:.6rem; align-items:center; margin:1rem 0 1.5rem; flex-wrap:wrap}
 .custom span{font:800 .7rem/1 var(--body); letter-spacing:.18em; text-transform:uppercase; color:var(--muted)}
 .custom input{max-width:260px; padding:.5rem .7rem}
 
@@ -189,8 +177,10 @@ footer .wrap{display:flex; justify-content:space-between; align-items:center; ga
 @media (max-width:480px){
   .strip > span:nth-child(2){display:none}
   .moves.two{grid-template-columns:1fr}
+  .pick label{grid-template-columns:auto 48px 1fr; gap:.7rem; padding:.6rem .7rem}
+  .pick-art{width:48px; height:48px}
 }
 @media (prefers-reduced-motion:reduce){
   .ticker-track{animation:none}
-  .card, .btn{transition:none}
+  .pick, .btn{transition:none}
 }
