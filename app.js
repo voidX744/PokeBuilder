@@ -148,11 +148,14 @@ const PLAN_SCHEMA = {
   },
 };
 
-const SYSTEM = `You are a competitive Pokémon team-building coach writing for a young, enthusiastic player.
-The player gives you their ace Pokémon, its set, the format and what they want the team to do. Over several turns they add teammates one at a time.
+const SYSTEM = `You are a Pokémon Champions team-building coach writing for a young, enthusiastic player.
+The game is Pokémon Champions, current ranked format Regulation M-C (Sept 9 - Dec 2, 2026), played as Doubles or Singles as the player chooses.
+Champions rules to respect: only Pokémon on the current regulation's roster are allowed (when unsure, stick to well-known picks you're confident are in Champions); Mega Evolution is allowed but only one Pokémon can Mega Evolve per battle; no two Pokémon may hold the same item.
+The player gives you their ace Pokémon, its set and what they want the team to do. Over several turns they add teammates one at a time.
 Each turn, look at the current team and return the roles still needed to fill the remaining slots (exactly as many roles as open slots), most important first.
-For every role give exactly 3 recommended Pokémon that are legal and sensible for the stated format, each with a full set (ability, item, 4 moves).
-Never recommend a species already on the team, and avoid duplicate items where the format has Item Clause.
+For every role give exactly 3 recommended Pokémon, each with a full set (ability, item, 4 moves) built for the chosen battle style (Doubles sets use spread moves, Protect, Fake Out, speed control etc.).
+Never recommend a species already on the team or an item already held on the team. A team can carry more than one Mega Stone, but point out in the reason that only one can Mega Evolve each battle.
+If the ace doesn't look legal in Champions, say so in the coach's note.
 Re-plan the roles every turn based on what has actually been picked: cover new weaknesses the picks created and drop needs they already cover.
 Keep the language short, hype and easy to read.`;
 
@@ -181,6 +184,9 @@ async function askCoach() {
   if (!apiKey) {
     openKeyDialog();
     throw new Error("Add your Claude API key to get suggestions.");
+  }
+  if (!apiKey.startsWith("sk-ant-")) {
+    throw new Error("That doesn't look like an API key. A real key starts with sk-ant- (make one under API Keys at console.anthropic.com).");
   }
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const res = await client.beta.messages.create({
@@ -296,7 +302,7 @@ $("exportBtn").addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(txt);
     $("exportBtn").lastChild.textContent = "Copied!";
-    setTimeout(() => ($("exportBtn").lastChild.textContent = "Copy Showdown"), 1500);
+    setTimeout(() => ($("exportBtn").lastChild.textContent = "Copy team"), 1500);
   } catch {
     $("doneSection").hidden = false;
     $("exportText").textContent = txt;
@@ -413,7 +419,7 @@ function renderRoles() {
 }
 
 function renderTicker() {
-  const base = ["Pick your ace", "Tell it what to do", "Fill every role", "Six slots. Zero gaps.", "Copy to Showdown"];
+  const base = ["Pokémon Champions", "Regulation M-C", "Pick your ace", "One Mega per battle", "Fill every role", "Six slots. Zero gaps."];
   const names = [state.ace?.name, ...state.team.map((m) => m.name)].filter(Boolean);
   const items = names.length ? [...names.map((n) => `${n} is in`), ...base] : base;
   const track = $("ticker");
@@ -433,7 +439,8 @@ if (state.ace) {
   document.querySelectorAll('input[name="move"]').forEach((el, i) => (el.value = state.ace.moves[i] || ""));
   $("aceAbility").value = state.ace.ability;
   $("aceItem").value = state.ace.item;
-  $("format").value = state.ace.format;
+  // older saves may hold a format that's no longer in the list
+  if ([...$("format").options].some((o) => o.value === state.ace.format)) $("format").value = state.ace.format;
   $("goal").value = state.ace.goal;
   $("acePreview").replaceChildren(spriteImg(state.ace.name));
 }
