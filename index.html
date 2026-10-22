@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>teamX6 · Pokémon Team Builder</title>
+  <title>teamX6 · Pokémon Champions Team Builder</title>
   <meta name="description" content="Drop in your ace Pokémon, say how you want to play, and pick teammates role by role with AI help.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,12 +14,12 @@
   <div class="wrap">
     <div class="strip">
       <span class="live">AI team builder</span>
-      <span>Issue · Squad edition</span>
+      <span>Champions · Reg M-C</span>
       <button class="strip-btn" id="keyBtn" type="button">API key</button>
     </div>
     <header class="masthead">
       <h1 class="logo">team<span>X</span>6</h1>
-      <p class="tagline"><b>Pick. Build. Battle.</b>Bring your ace, tell it what you want, and fill your squad one role at a time.</p>
+      <p class="tagline"><b>Champions edition.</b>Bring your ace, tell it what you want, and fill your Pokémon Champions squad one role at a time.</p>
     </header>
   </div>
 
@@ -48,16 +48,14 @@
 
         <div class="moves two">
           <label class="field"><span>Ability <i>optional</i></span><input id="aceAbility" placeholder="Rough Skin"></label>
-          <label class="field"><span>Item <i>optional</i></span><input id="aceItem" placeholder="Life Orb"></label>
+          <label class="field"><span>Item <i>optional</i></span><input id="aceItem" placeholder="Garchompite"></label>
         </div>
 
         <label class="field">
           <span>Format</span>
           <select id="format">
-            <option>Any / casual</option>
-            <option>Singles (Smogon OU)</option>
-            <option>Doubles (VGC)</option>
-            <option>In-game playthrough</option>
+            <option>Pokémon Champions · Doubles (Regulation M-C)</option>
+            <option>Pokémon Champions · Singles (Regulation M-C)</option>
           </select>
         </label>
 
@@ -73,7 +71,7 @@
         <h3><small>Line-up</small>Your squad</h3>
         <ol id="squad"></ol>
         <div class="toc-actions">
-          <button class="btn small" type="button" id="exportBtn" disabled><i>⇩</i>Copy Showdown</button>
+          <button class="btn small" type="button" id="exportBtn" disabled><i>⇩</i>Copy team</button>
           <button class="btn small ghost" type="button" id="resetBtn">Reset</button>
         </div>
       </aside>
@@ -92,7 +90,7 @@
     <section id="doneSection" hidden>
       <div class="section-head">
         <h2>Squad complete</h2>
-        <p>Paste this straight into Pokémon Showdown</p>
+        <p>Your full team with sets, ready to build in Champions</p>
       </div>
       <pre class="export" id="exportText"></pre>
     </section>
