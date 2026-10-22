@@ -15,12 +15,18 @@ const store = {
 
 // ---------- state ----------
 // state.ace: { name, moves[], ability, item, format, goal }
-// state.team: [{ name, types[], role, ability, item, moves[] }]   (picks after the ace)
+// state.team: [{ name, types[], role, ability, item, moves[] }]   (locked-in picks after the ace)
 // state.plan: { coach, roles[] } | null   (latest AI suggestions)
-let state = load() || { ace: null, team: [], plan: null };
+// state.choices: { [roleIndex]: member }  (picks selected but not locked in yet)
+let state = load() || fresh();
 
+function fresh() { return { ace: null, team: [], plan: null, choices: {} }; }
 function load() {
-  try { return JSON.parse(store.get(STATE_STORE)); } catch { return null; }
+  try {
+    const s = JSON.parse(store.get(STATE_STORE));
+    if (s) s.choices ||= {};
+    return s;
+  } catch { return null; }
 }
 function save() { store.set(STATE_STORE, JSON.stringify(state)); }
 
@@ -32,10 +38,9 @@ function slug(name) {
     .replace(/[.'’:%]/g, "")
     .replace(/\s+/g, "-");
 }
-function spriteImg(name, cls = "") {
+function spriteImg(name) {
   const img = new Image();
   img.alt = name;
-  if (cls) img.className = cls;
   const s = slug(name);
   const sources = [
     `https://img.pokemondb.net/sprites/home/normal/${s}.png`,
@@ -46,10 +51,11 @@ function spriteImg(name, cls = "") {
   img.onerror = () => {
     i++;
     if (i < sources.length) img.src = sources[i];
-    else img.replaceWith(Object.assign(document.createElement("span"), { className: "ball" }));
+    else img.replaceWith(ball());
   };
   return img;
 }
+const ball = () => Object.assign(document.createElement("span"), { className: "ball" });
 
 // ---------- type colours ----------
 const TYPE_COLORS = {
@@ -58,9 +64,7 @@ const TYPE_COLORS = {
   rock:"#c9b45a", ghost:"#8a72c9", dragon:"#7a5cff", dark:"#9a8a7a", steel:"#b8c4d6", fairy:"#ffa6d8",
 };
 function typeTag(t) {
-  const el = document.createElement("span");
-  el.className = "tag";
-  el.textContent = t;
+  const el = Object.assign(document.createElement("span"), { className: "tag", textContent: t });
   const c = TYPE_COLORS[t.toLowerCase()];
   if (c) el.style.setProperty("--tc", c);
   return el;
@@ -83,10 +87,8 @@ let previewTimer;
 $("aceName").addEventListener("input", (e) => {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
-    const box = $("acePreview");
-    box.replaceChildren();
     const v = e.target.value.trim();
-    box.append(v ? spriteImg(v) : Object.assign(document.createElement("span"), { className: "ball" }));
+    $("acePreview").replaceChildren(v ? spriteImg(v) : ball());
   }, 300);
 });
 
@@ -151,18 +153,18 @@ const PLAN_SCHEMA = {
 const SYSTEM = `You are a Pokémon Champions team-building coach writing for a young, enthusiastic player.
 The game is Pokémon Champions, current ranked format Regulation M-C (Sept 9 - Dec 2, 2026), played as Doubles or Singles as the player chooses.
 Champions rules to respect: only Pokémon on the current regulation's roster are allowed (when unsure, stick to well-known picks you're confident are in Champions); Mega Evolution is allowed but only one Pokémon can Mega Evolve per battle; no two Pokémon may hold the same item.
-The player gives you their ace Pokémon, its set and what they want the team to do. Over several turns they add teammates one at a time.
-Each turn, look at the current team and return the roles still needed to fill the remaining slots (exactly as many roles as open slots), most important first.
+The player gives you their ace Pokémon, its set and what they want the team to do, plus any teammates already locked in.
+Return the roles still needed to fill the remaining slots (exactly as many roles as open slots), most important first.
+The player will choose one Pokémon for every role at the same time, so the 3 picks across different roles must work together: no species or item may appear in more than one role, and none may clash with the existing team.
 For every role give exactly 3 recommended Pokémon, each with a full set (ability, item, 4 moves) built for the chosen battle style (Doubles sets use spread moves, Protect, Fake Out, speed control etc.).
-Never recommend a species already on the team or an item already held on the team. A team can carry more than one Mega Stone, but point out in the reason that only one can Mega Evolve each battle.
+A team can carry more than one Mega Stone, but point out in the reason that only one can Mega Evolve each battle.
 If the ace doesn't look legal in Champions, say so in the coach's note.
-Re-plan the roles every turn based on what has actually been picked: cover new weaknesses the picks created and drop needs they already cover.
 Keep the language short, hype and easy to read.`;
 
 function buildPrompt() {
   const a = state.ace;
-  const open = 6 - 1 - state.team.length;
-  const lines = [
+  const open = 5 - state.team.length;
+  return [
     `Format: ${a.format}`,
     `What I want the team to do: ${a.goal}`,
     ``,
@@ -171,12 +173,11 @@ function buildPrompt() {
     a.ability ? `  Ability: ${a.ability}` : null,
     a.item ? `  Item: ${a.item}` : null,
     ``,
-    state.team.length ? `Teammates picked so far:` : `No teammates picked yet.`,
-    ...state.team.map((m) => `- ${m.name} (role: ${m.role}) — ${m.ability} / ${m.item} / ${m.moves.join(", ")}`),
+    state.team.length ? `Teammates locked in so far:` : `No teammates locked in yet.`,
+    ...state.team.map((m) => `- ${m.name} (role: ${m.role || "my choice"})${m.ability ? ` — ${m.ability} / ${m.item} / ${m.moves.join(", ")}` : ""}`),
     ``,
     `Open slots: ${open}. Give me exactly ${open} roles.`,
-  ];
-  return lines.filter((l) => l !== null).join("\n");
+  ].filter((l) => l !== null).join("\n");
 }
 
 async function askCoach() {
@@ -189,18 +190,23 @@ async function askCoach() {
     throw new Error("That doesn't look like an API key. A real key starts with sk-ant- (make one under API Keys at console.anthropic.com).");
   }
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-  const res = await client.beta.messages.create({
-    model: MODEL,
-    max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: {
-      effort: "medium",
-      format: { type: "json_schema", schema: PLAN_SCHEMA },
-    },
-    system: SYSTEM,
-    messages: [{ role: "user", content: buildPrompt() }],
-  });
+  let res;
+  try {
+    res = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: {
+        effort: "medium",
+        format: { type: "json_schema", schema: PLAN_SCHEMA },
+      },
+      system: SYSTEM,
+      messages: [{ role: "user", content: buildPrompt() }],
+    });
+  } catch (err) {
+    throw new Error(friendlyError(err));
+  }
   if (res.stop_reason === "refusal") throw new Error("The coach couldn't help with that one. Try rewording your goal.");
   if (res.stop_reason === "max_tokens") throw new Error("The answer got cut off. Try again.");
   const text = res.content.find((b) => b.type === "text")?.text;
@@ -221,15 +227,16 @@ async function replan() {
   if (busy) return;
   busy = true;
   state.plan = null;
+  state.choices = {};
   save();
   render();
-  setStatus(`<span class="loader"></span>Scouting the dex for your next teammates…`);
+  setStatus(`<span class="loader"></span>Scouting the dex for your teammates…`);
   try {
     state.plan = await askCoach();
     save();
     setStatus("");
   } catch (err) {
-    setStatus(`${friendlyError(err)} <button class="btn small ghost" id="retryBtn" type="button">Retry</button>`, true);
+    setStatus(`${err.message} <button class="btn small ghost" id="retryBtn" type="button">Retry</button>`, true);
     $("retryBtn")?.addEventListener("click", replan);
   } finally {
     busy = false;
@@ -248,37 +255,56 @@ function setStatus(html, isErr = false) {
 $("aceForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const moves = [...document.querySelectorAll('input[name="move"]')].map((i) => i.value.trim()).filter(Boolean);
-  state = {
-    ace: {
-      name: $("aceName").value.trim(),
-      moves,
-      ability: $("aceAbility").value.trim(),
-      item: $("aceItem").value.trim(),
-      format: $("format").value,
-      goal: $("goal").value.trim(),
-    },
-    team: [],
-    plan: null,
+  state = fresh();
+  state.ace = {
+    name: $("aceName").value.trim(),
+    moves,
+    ability: $("aceAbility").value.trim(),
+    item: $("aceItem").value.trim(),
+    format: $("format").value,
+    goal: $("goal").value.trim(),
   };
   save();
   replan();
   $("rolesSection").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-function pick(member) {
+// select (or unselect) one Pokémon for a role
+function choose(ri, member) {
   if (busy) return;
-  if (state.team.some((m) => slug(m.name) === slug(member.name))) return;
-  state.team.push(member);
+  const current = state.choices[ri];
+  if (current && slug(current.name) === slug(member.name)) delete state.choices[ri];
+  else {
+    const taken = [...state.team, ...Object.entries(state.choices).filter(([k]) => +k !== ri).map(([, m]) => m)];
+    if (taken.some((m) => slug(m.name) === slug(member.name))) {
+      setStatus(`${member.name} is already on your team.`, true);
+      return;
+    }
+    state.choices[ri] = member;
+  }
+  setStatus("");
   save();
+  render();
+}
+
+// lock in every selected pick at once
+$("lockBtn").addEventListener("click", () => {
+  if (busy) return;
+  const picked = state.plan.roles.map((_, ri) => state.choices[ri]).filter(Boolean);
+  if (!picked.length) return;
+  state.team.push(...picked);
+  state.choices = {};
   if (state.team.length >= 5) {
     state.plan = null;
     save();
     render();
     $("doneSection").scrollIntoView({ behavior: "smooth", block: "start" });
   } else {
+    // some roles were left empty: ask for new roles around the picks
+    save();
     replan();
   }
-}
+});
 
 function removeMember(i) {
   if (busy) return;
@@ -289,16 +315,16 @@ function removeMember(i) {
 
 $("resetBtn").addEventListener("click", () => {
   if (busy) return;
-  state = { ace: null, team: [], plan: null };
+  state = fresh();
   store.del(STATE_STORE);
   $("aceForm").reset();
-  $("acePreview").replaceChildren(Object.assign(document.createElement("span"), { className: "ball" }));
+  $("acePreview").replaceChildren(ball());
   setStatus("");
   render();
 });
 
 $("exportBtn").addEventListener("click", async () => {
-  const txt = showdownText();
+  const txt = teamText();
   try {
     await navigator.clipboard.writeText(txt);
     $("exportBtn").lastChild.textContent = "Copied!";
@@ -309,7 +335,7 @@ $("exportBtn").addEventListener("click", async () => {
   }
 });
 
-function showdownText() {
+function teamText() {
   const sets = [];
   if (state.ace) sets.push({ name: state.ace.name, ability: state.ace.ability, item: state.ace.item, moves: state.ace.moves });
   sets.push(...state.team);
@@ -345,7 +371,7 @@ function renderSquad() {
       } else li.append(document.createElement("span"));
     } else {
       li.className = "empty";
-      mini.append(Object.assign(document.createElement("span"), { className: "ball" }));
+      mini.append(ball());
       t.textContent = i === 0 ? "Your ace" : "Open slot";
       li.append(document.createElement("span"));
     }
@@ -355,25 +381,37 @@ function renderSquad() {
 }
 
 function renderRoles() {
-  const section = $("rolesSection");
   const wrap = $("roles");
   wrap.replaceChildren();
   const done = state.ace && state.team.length >= 5;
-  section.hidden = !state.ace || done;
+  $("rolesSection").hidden = !state.ace || done;
   $("doneSection").hidden = !done;
-  if (done) $("exportText").textContent = showdownText();
+  if (done) $("exportText").textContent = teamText();
   if (!state.ace) return;
 
   const open = 5 - state.team.length;
-  $("slotsLeft").textContent = `${open} slot${open === 1 ? "" : "s"} left · pick one to continue`;
+  $("slotsLeft").textContent = `${open} slot${open === 1 ? "" : "s"} left · choose one per role, then hit Done`;
 
   const coach = $("coach");
   coach.hidden = !state.plan;
-  if (state.plan) coach.innerHTML = `<b>Coach's note</b>`, coach.append(state.plan.coach);
+  if (state.plan) {
+    coach.innerHTML = `<b>Coach's note</b>`;
+    coach.append(state.plan.coach);
+  }
 
+  const bar = $("doneBar");
+  bar.hidden = !state.plan;
   if (!state.plan) return;
-  state.plan.roles.forEach((role, ri) => {
-    const sec = Object.assign(document.createElement("article"), { className: "role" });
+
+  const roles = state.plan.roles;
+  const chosen = roles.filter((_, ri) => state.choices[ri]).length;
+  $("doneCount").textContent = `${chosen} / ${roles.length} roles chosen`;
+  $("lockBtn").disabled = chosen === 0;
+  $("lockBtn").lastChild.textContent = chosen === roles.length ? "Done" : chosen ? "Done (re-plan the rest)" : "Done";
+
+  roles.forEach((role, ri) => {
+    const sel = state.choices[ri];
+    const sec = Object.assign(document.createElement("article"), { className: "role" + (sel ? " has-pick" : "") });
     const head = Object.assign(document.createElement("div"), { className: "role-head" });
     head.append(Object.assign(document.createElement("span"), { className: "role-num", textContent: String(ri + 1).padStart(2, "0") }));
     const ht = document.createElement("div");
@@ -383,7 +421,8 @@ function renderRoles() {
 
     const grid = Object.assign(document.createElement("div"), { className: "grid" });
     for (const p of role.picks) {
-      const card = Object.assign(document.createElement("div"), { className: "card" });
+      const isSel = sel && slug(sel.name) === slug(p.name);
+      const card = Object.assign(document.createElement("div"), { className: "card" + (isSel ? " selected" : "") });
       const art = Object.assign(document.createElement("div"), { className: "card-art" });
       art.append(spriteImg(p.name));
       const body = Object.assign(document.createElement("div"), { className: "card-body" });
@@ -395,10 +434,11 @@ function renderRoles() {
       meta.innerHTML = `<span><b>Ability</b> </span><span><b>Item</b> </span>`;
       meta.children[0].append(p.ability);
       meta.children[1].append(p.item);
-      const btn = Object.assign(document.createElement("button"), { className: "btn small primary", type: "button" });
-      btn.innerHTML = `<i>+</i>`;
-      btn.append(`Pick ${p.name}`);
-      btn.addEventListener("click", () => pick({ name: p.name, types: p.types, role: role.title, ability: p.ability, item: p.item, moves: p.moves }));
+      const btn = Object.assign(document.createElement("button"), { className: "btn small " + (isSel ? "primary" : "ghost-on"), type: "button" });
+      btn.setAttribute("aria-pressed", String(!!isSel));
+      btn.innerHTML = `<i>${isSel ? "✓" : "+"}</i>`;
+      btn.append(isSel ? "Chosen" : `Choose ${p.name}`);
+      btn.addEventListener("click", () => choose(ri, { name: p.name, types: p.types, role: role.title, ability: p.ability, item: p.item, moves: p.moves }));
       body.append(types, Object.assign(document.createElement("h4"), { textContent: p.name }), Object.assign(document.createElement("p"), { className: "blurb", textContent: p.reason }), set, meta, btn);
       card.append(art, body);
       grid.append(card);
@@ -407,11 +447,13 @@ function renderRoles() {
 
     // let them choose their own mon for this role
     const custom = Object.assign(document.createElement("form"), { className: "custom" });
-    custom.innerHTML = `<span>Or pick your own</span><input list="dex" placeholder="Any Pokémon" required><button class="btn small ghost" type="submit">Use it</button>`;
+    const ownSel = sel && !role.picks.some((p) => slug(p.name) === slug(sel.name));
+    custom.innerHTML = `<span>Or choose your own</span><input list="dex" placeholder="Any Pokémon" required><button class="btn small ghost" type="submit">Use it</button>`;
+    if (ownSel) custom.querySelector("input").value = sel.name, custom.append(Object.assign(document.createElement("b"), { className: "own-pick", textContent: `✓ ${sel.name} chosen` }));
     custom.addEventListener("submit", (e) => {
       e.preventDefault();
       const name = custom.querySelector("input").value.trim();
-      if (name) pick({ name, types: [], role: role.title, ability: "", item: "", moves: [] });
+      if (name) choose(ri, { name, types: [], role: role.title, ability: "", item: "", moves: [] });
     });
     sec.append(custom);
     wrap.append(sec);
