@@ -92,7 +92,7 @@ input:focus, select:focus, textarea:focus{outline:none; border-color:var(--neon)
 .btn.small i{width:1.5rem; height:1.5rem; font-size:.8rem}
 .btn.ghost{padding:.55rem 1rem; background:transparent}
 .btn.small.ghost{padding:.4rem .9rem}
-.btn:focus-visible, .chip:focus-visible, .strip-btn:focus-visible{outline:3px solid var(--neon); outline-offset:3px}
+.btn:focus-visible, .strip-btn:focus-visible{outline:3px solid var(--neon); outline-offset:3px}
 
 /* squad sidebar (toc) */
 .panel-grad{background:linear-gradient(160deg,var(--panel-2),var(--panel)); border:1px solid var(--line); padding:1.3rem 1.3rem 1rem; position:sticky; top:1rem}
@@ -122,7 +122,7 @@ input:focus, select:focus, textarea:focus{outline:none; border-color:var(--neon)
 .loader{display:inline-block; width:22px; height:22px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--neon); animation:spin .8s linear infinite; vertical-align:-5px; margin-right:.6rem}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.roles{display:flex; flex-direction:column; gap:2rem; margin-bottom:3rem}
+.roles{display:flex; flex-direction:column; gap:2rem; margin-bottom:1.5rem}
 .role{--rarity:var(--legendary)}
 .role:nth-child(4n+1){--rarity:var(--epic)}
 .role:nth-child(4n+2){--rarity:var(--rare)}
@@ -152,6 +152,19 @@ input:focus, select:focus, textarea:focus{outline:none; border-color:var(--neon)
 .meta{display:flex; flex-wrap:wrap; gap:.3rem .8rem; font-size:.75rem; color:var(--muted); font-weight:600}
 .meta b{color:var(--text); font-weight:800}
 .card .btn{margin-top:auto; align-self:flex-start}
+
+/* choosing picks */
+.card.selected{box-shadow:0 0 0 3px var(--neon), 0 0 30px rgba(62,225,62,.25)}
+.card.selected:hover{box-shadow:0 0 0 3px var(--neon), 0 18px 40px rgba(0,0,0,.5)}
+.btn.ghost-on{background:transparent}
+.role.has-pick .role-num::after{content:" ✓"; font-size:1.2rem; color:var(--neon); vertical-align:top}
+.own-pick{color:var(--neon); font-size:.8rem; letter-spacing:.06em}
+.donebar{
+  position:sticky; bottom:16px; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+  margin:0 0 3rem; padding:.8rem .8rem .8rem 1.2rem; background:var(--panel-2); border:2px solid var(--neon);
+  box-shadow:0 12px 40px rgba(0,0,0,.6), 0 0 24px rgba(62,225,62,.2);
+}
+.donebar span{font-family:var(--display); font-size:1.4rem; text-transform:uppercase; letter-spacing:.04em}
 
 .custom{display:flex; gap:.6rem; align-items:center; margin-top:1rem; flex-wrap:wrap}
 .custom span{font:800 .7rem/1 var(--body); letter-spacing:.18em; text-transform:uppercase; color:var(--muted)}
