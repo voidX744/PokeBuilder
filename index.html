@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>teamX6 · Pokémon Team Builder</title>
+  <meta name="description" content="Drop in your ace Pokémon, say how you want to play, and pick teammates role by role with AI help.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="strip">
+      <span class="live">AI team builder</span>
+      <span>Issue · Squad edition</span>
+      <button class="strip-btn" id="keyBtn" type="button">API key</button>
+    </div>
+    <header class="masthead">
+      <h1 class="logo">team<span>X</span>6</h1>
+      <p class="tagline"><b>Pick. Build. Battle.</b>Bring your ace, tell it what you want, and fill your squad one role at a time.</p>
+    </header>
+  </div>
+
+  <div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
+
+  <main class="wrap">
+    <section class="cover">
+      <form class="cover-main panel" id="aceForm" autocomplete="off">
+        <span class="kicker">Step 01 · Your ace</span>
+        <h2>Who's leading the squad?</h2>
+
+        <div class="ace-row">
+          <div class="sprite-box" id="acePreview"><span class="ball"></span></div>
+          <label class="field grow">
+            <span>Pokémon</span>
+            <input id="aceName" list="dex" placeholder="e.g. Garchomp" required>
+          </label>
+        </div>
+
+        <div class="moves">
+          <label class="field"><span>Move 1</span><input name="move" placeholder="Earthquake" required></label>
+          <label class="field"><span>Move 2</span><input name="move" placeholder="Dragon Claw"></label>
+          <label class="field"><span>Move 3</span><input name="move" placeholder="Swords Dance"></label>
+          <label class="field"><span>Move 4</span><input name="move" placeholder="Stone Edge"></label>
+        </div>
+
+        <div class="moves two">
+          <label class="field"><span>Ability <i>optional</i></span><input id="aceAbility" placeholder="Rough Skin"></label>
+          <label class="field"><span>Item <i>optional</i></span><input id="aceItem" placeholder="Life Orb"></label>
+        </div>
+
+        <label class="field">
+          <span>Format</span>
+          <select id="format">
+            <option>Any / casual</option>
+            <option>Singles (Smogon OU)</option>
+            <option>Doubles (VGC)</option>
+            <option>In-game playthrough</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>What do you want it to do?</span>
+          <textarea id="goal" rows="3" placeholder="Set up Swords Dance and sweep late game. I want a hyper-offense team that hits hard and fast." required></textarea>
+        </label>
+
+        <button class="btn primary" type="submit" id="buildBtn"><i>▶</i>Build my squad</button>
+      </form>
+
+      <aside class="toc panel-grad">
+        <h3><small>Line-up</small>Your squad</h3>
+        <ol id="squad"></ol>
+        <div class="toc-actions">
+          <button class="btn small" type="button" id="exportBtn" disabled><i>⇩</i>Copy Showdown</button>
+          <button class="btn small ghost" type="button" id="resetBtn">Reset</button>
+        </div>
+      </aside>
+    </section>
+
+    <section id="rolesSection" hidden>
+      <div class="section-head">
+        <h2>Roles to fill</h2>
+        <p id="slotsLeft"></p>
+      </div>
+      <div class="coach" id="coach" hidden></div>
+      <div id="status" class="status" role="status" hidden></div>
+      <div class="roles" id="roles"></div>
+    </section>
+
+    <section id="doneSection" hidden>
+      <div class="section-head">
+        <h2>Squad complete</h2>
+        <p>Paste this straight into Pokémon Showdown</p>
+      </div>
+      <pre class="export" id="exportText"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>teamX6 · fan-made, not affiliated with Nintendo, Game Freak or The Pokémon Company.</span>
+      <span>Sprites from PokémonDB · names from PokéAPI</span>
+    </div>
+  </footer>
+
+  <dialog id="keyDialog">
+    <form method="dialog" class="dialog-body">
+      <h3><small>Settings</small>Your Claude API key</h3>
+      <p>This site runs in your browser, so it uses your own Anthropic API key. It's saved only in this browser and sent only to Anthropic. Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+      <label class="field"><span>API key</span><input id="keyInput" type="password" placeholder="sk-ant-..."></label>
+      <div class="toc-actions">
+        <button class="btn small primary" value="save"><i>✓</i>Save</button>
+        <button class="btn small ghost" value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <datalist id="dex"></datalist>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
