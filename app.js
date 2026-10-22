@@ -17,14 +17,14 @@ const store = {
 // state.ace: { name, moves[], ability, item, format, goal }
 // state.team: [{ name, types[], role, ability, item, moves[] }]   (locked-in picks after the ace)
 // state.plan: { coach, roles[] } | null   (latest AI suggestions)
-// state.choices: { [roleIndex]: member }  (picks selected but not locked in yet)
+// state.ticked: [member]                   (picks ticked but not locked in yet)
 let state = load() || fresh();
 
-function fresh() { return { ace: null, team: [], plan: null, choices: {} }; }
+function fresh() { return { ace: null, team: [], plan: null, ticked: [] }; }
 function load() {
   try {
     const s = JSON.parse(store.get(STATE_STORE));
-    if (s) s.choices ||= {};
+    if (s && !Array.isArray(s.ticked)) s.ticked = [];
     return s;
   } catch { return null; }
 }
@@ -155,7 +155,7 @@ The game is Pokémon Champions, current ranked format Regulation M-C (Sept 9 - D
 Champions rules to respect: only Pokémon on the current regulation's roster are allowed (when unsure, stick to well-known picks you're confident are in Champions); Mega Evolution is allowed but only one Pokémon can Mega Evolve per battle; no two Pokémon may hold the same item.
 The player gives you their ace Pokémon, its set and what they want the team to do, plus any teammates already locked in.
 Return the roles still needed to fill the remaining slots (exactly as many roles as open slots), most important first.
-The player will choose one Pokémon for every role at the same time, so the 3 picks across different roles must work together: no species or item may appear in more than one role, and none may clash with the existing team.
+The player sees every pick in one list and ticks the ones they want at the same time, so all picks must work together: no species or item may appear in more than one role, and none may clash with the existing team.
 For every role give exactly 3 recommended Pokémon, each with a full set (ability, item, 4 moves) built for the chosen battle style (Doubles sets use spread moves, Protect, Fake Out, speed control etc.).
 A team can carry more than one Mega Stone, but point out in the reason that only one can Mega Evolve each battle.
 If the ace doesn't look legal in Champions, say so in the coach's note.
@@ -227,7 +227,7 @@ async function replan() {
   if (busy) return;
   busy = true;
   state.plan = null;
-  state.choices = {};
+  state.ticked = [];
   save();
   render();
   setStatus(`<span class="loader"></span>Scouting the dex for your teammates…`);
@@ -269,38 +269,42 @@ $("aceForm").addEventListener("submit", (e) => {
   $("rolesSection").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-// select (or unselect) one Pokémon for a role
-function choose(ri, member) {
+const openSlots = () => 5 - state.team.length;
+const isTicked = (name) => state.ticked.some((m) => slug(m.name) === slug(name));
+
+// tick (or untick) a Pokémon in the list
+function toggle(member) {
   if (busy) return;
-  const current = state.choices[ri];
-  if (current && slug(current.name) === slug(member.name)) delete state.choices[ri];
-  else {
-    const taken = [...state.team, ...Object.entries(state.choices).filter(([k]) => +k !== ri).map(([, m]) => m)];
-    if (taken.some((m) => slug(m.name) === slug(member.name))) {
+  if (isTicked(member.name)) {
+    state.ticked = state.ticked.filter((m) => slug(m.name) !== slug(member.name));
+  } else {
+    if (state.team.some((m) => slug(m.name) === slug(member.name)) || slug(member.name) === slug(state.ace.name)) {
       setStatus(`${member.name} is already on your team.`, true);
       return;
     }
-    state.choices[ri] = member;
+    if (state.ticked.length >= openSlots()) {
+      setStatus(`You can only tick ${openSlots()}. Untick one first.`, true);
+      return;
+    }
+    state.ticked.push(member);
   }
   setStatus("");
   save();
   render();
 }
 
-// lock in every selected pick at once
+// lock in every ticked pick at once
 $("lockBtn").addEventListener("click", () => {
-  if (busy) return;
-  const picked = state.plan.roles.map((_, ri) => state.choices[ri]).filter(Boolean);
-  if (!picked.length) return;
-  state.team.push(...picked);
-  state.choices = {};
+  if (busy || !state.ticked.length) return;
+  state.team.push(...state.ticked);
+  state.ticked = [];
   if (state.team.length >= 5) {
     state.plan = null;
     save();
     render();
     $("doneSection").scrollIntoView({ behavior: "smooth", block: "start" });
   } else {
-    // some roles were left empty: ask for new roles around the picks
+    // some slots are still empty: ask for new picks around the ones they ticked
     save();
     replan();
   }
@@ -389,8 +393,8 @@ function renderRoles() {
   if (done) $("exportText").textContent = teamText();
   if (!state.ace) return;
 
-  const open = 5 - state.team.length;
-  $("slotsLeft").textContent = `${open} slot${open === 1 ? "" : "s"} left · choose one per role, then hit Done`;
+  const open = openSlots();
+  $("slotsLeft").textContent = `${open} slot${open === 1 ? "" : "s"} left · tick the ones you want, then hit Done`;
 
   const coach = $("coach");
   coach.hidden = !state.plan;
@@ -403,61 +407,56 @@ function renderRoles() {
   bar.hidden = !state.plan;
   if (!state.plan) return;
 
-  const roles = state.plan.roles;
-  const chosen = roles.filter((_, ri) => state.choices[ri]).length;
-  $("doneCount").textContent = `${chosen} / ${roles.length} roles chosen`;
-  $("lockBtn").disabled = chosen === 0;
-  $("lockBtn").lastChild.textContent = chosen === roles.length ? "Done" : chosen ? "Done (re-plan the rest)" : "Done";
+  const ticked = state.ticked.length;
+  $("doneCount").textContent = `${ticked} / ${open} ticked`;
+  $("lockBtn").disabled = ticked === 0;
+  $("lockBtn").lastChild.textContent = ticked === open ? "Done" : ticked ? "Done (suggest more)" : "Done";
 
-  roles.forEach((role, ri) => {
-    const sel = state.choices[ri];
-    const sec = Object.assign(document.createElement("article"), { className: "role" + (sel ? " has-pick" : "") });
-    const head = Object.assign(document.createElement("div"), { className: "role-head" });
-    head.append(Object.assign(document.createElement("span"), { className: "role-num", textContent: String(ri + 1).padStart(2, "0") }));
-    const ht = document.createElement("div");
-    ht.append(Object.assign(document.createElement("h3"), { textContent: role.title }), Object.assign(document.createElement("p"), { textContent: role.why }));
-    head.append(ht);
-    sec.append(head);
+  // every AI pick in one list, tagged with its role, plus any the player added themselves
+  const rows = state.plan.roles.flatMap((role, ri) => role.picks.map((p) => ({ ...p, role: role.title, ri })));
+  for (const m of state.ticked) {
+    if (!rows.some((r) => slug(r.name) === slug(m.name))) rows.push({ ...m, ri: -1 });
+  }
+  const full = ticked >= open;
 
-    const grid = Object.assign(document.createElement("div"), { className: "grid" });
-    for (const p of role.picks) {
-      const isSel = sel && slug(sel.name) === slug(p.name);
-      const card = Object.assign(document.createElement("div"), { className: "card" + (isSel ? " selected" : "") });
-      const art = Object.assign(document.createElement("div"), { className: "card-art" });
-      art.append(spriteImg(p.name));
-      const body = Object.assign(document.createElement("div"), { className: "card-body" });
-      const types = Object.assign(document.createElement("div"), { className: "types" });
-      p.types.forEach((t) => types.append(typeTag(t)));
-      const set = Object.assign(document.createElement("ul"), { className: "set" });
-      p.moves.forEach((mv) => set.append(Object.assign(document.createElement("li"), { textContent: mv })));
-      const meta = Object.assign(document.createElement("div"), { className: "meta" });
-      meta.innerHTML = `<span><b>Ability</b> </span><span><b>Item</b> </span>`;
-      meta.children[0].append(p.ability);
-      meta.children[1].append(p.item);
-      const btn = Object.assign(document.createElement("button"), { className: "btn small " + (isSel ? "primary" : "ghost-on"), type: "button" });
-      btn.setAttribute("aria-pressed", String(!!isSel));
-      btn.innerHTML = `<i>${isSel ? "✓" : "+"}</i>`;
-      btn.append(isSel ? "Chosen" : `Choose ${p.name}`);
-      btn.addEventListener("click", () => choose(ri, { name: p.name, types: p.types, role: role.title, ability: p.ability, item: p.item, moves: p.moves }));
-      body.append(types, Object.assign(document.createElement("h4"), { textContent: p.name }), Object.assign(document.createElement("p"), { className: "blurb", textContent: p.reason }), set, meta, btn);
-      card.append(art, body);
-      grid.append(card);
+  const list = Object.assign(document.createElement("ul"), { className: "picklist" });
+  for (const p of rows) {
+    const on = isTicked(p.name);
+    const li = Object.assign(document.createElement("li"), { className: "pick" + (on ? " on" : "") + (!on && full ? " off" : "") });
+    li.style.setProperty("--rarity", p.ri < 0 ? "var(--neon)" : ["var(--epic)", "var(--rare)", "var(--uncommon)", "var(--legendary)"][p.ri % 4]);
+    const label = document.createElement("label");
+    const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: on, disabled: !on && full });
+    box.addEventListener("change", () => toggle({ name: p.name, types: p.types, role: p.role, ability: p.ability, item: p.item, moves: p.moves }));
+    const mini = Object.assign(document.createElement("span"), { className: "pick-art" });
+    mini.append(spriteImg(p.name));
+    const info = Object.assign(document.createElement("span"), { className: "pick-info" });
+    const top = Object.assign(document.createElement("span"), { className: "pick-top" });
+    top.append(Object.assign(document.createElement("b"), { className: "pick-name", textContent: p.name }));
+    p.types.forEach((t) => top.append(typeTag(t)));
+    top.append(Object.assign(document.createElement("span"), { className: "pick-role", textContent: p.role }));
+    info.append(top);
+    if (p.reason) info.append(Object.assign(document.createElement("span"), { className: "pick-reason", textContent: p.reason }));
+    if (p.moves.length) {
+      info.append(Object.assign(document.createElement("span"), {
+        className: "pick-set",
+        textContent: `${p.ability} · ${p.item} · ${p.moves.join(" / ")}`,
+      }));
     }
-    sec.append(grid);
+    label.append(box, mini, info);
+    li.append(label);
+    list.append(li);
+  }
+  wrap.append(list);
 
-    // let them choose their own mon for this role
-    const custom = Object.assign(document.createElement("form"), { className: "custom" });
-    const ownSel = sel && !role.picks.some((p) => slug(p.name) === slug(sel.name));
-    custom.innerHTML = `<span>Or choose your own</span><input list="dex" placeholder="Any Pokémon" required><button class="btn small ghost" type="submit">Use it</button>`;
-    if (ownSel) custom.querySelector("input").value = sel.name, custom.append(Object.assign(document.createElement("b"), { className: "own-pick", textContent: `✓ ${sel.name} chosen` }));
-    custom.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const name = custom.querySelector("input").value.trim();
-      if (name) choose(ri, { name, types: [], role: role.title, ability: "", item: "", moves: [] });
-    });
-    sec.append(custom);
-    wrap.append(sec);
+  // let them add their own Pokémon to the list
+  const custom = Object.assign(document.createElement("form"), { className: "custom" });
+  custom.innerHTML = `<span>Add your own</span><input list="dex" placeholder="Any Pokémon" required><button class="btn small ghost" type="submit">Add + tick</button>`;
+  custom.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = custom.querySelector("input").value.trim();
+    if (name) toggle({ name, types: [], role: "My pick", ability: "", item: "", moves: [] });
   });
+  wrap.append(custom);
 }
 
 function renderTicker() {
@@ -489,3 +488,5 @@ if (state.ace) {
 refreshKeyBtn();
 render();
 if (state.ace && !state.plan && state.team.length < 5) replan();
+
+
